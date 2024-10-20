@@ -92,3 +92,84 @@ class Solvers:
                 return True
 
         return False
+
+    def DPLL(self, clauses, assignment):
+      return self.dpll(clauses, assignment)
+
+    # For DPLL
+    def unit_propogate(self, clauses, assignment):
+      unit_clauses = [c for c in clauses if len(c) == 1]
+    
+      while unit_clauses:
+        unit = unit_clauses[0]
+        lit = unit[0]
+        assignment[abs(lit)] = lit > 0
+
+        clauses = [c for c in clauses if lit not in c]
+
+        for clause in clauses:
+          if -lit in clause:
+            clause.remove(-lit)
+
+        unit_clauses = [c for c in clauses if len(c) == 1]
+    
+      return clauses, assignment
+  
+    # For DPLL
+    def pure_literal_elim(self, clauses, assignment):
+      literals = set()
+      for clause in clauses:
+        for lit in clause:
+          literals.add(lit)
+
+      pure_literals = [lit for lit in literals if -lit not in literals]
+
+      for lit in pure_literals:
+        assignment[abs(lit)] = lit > 0
+        clauses = [c for c in clauses if lit not in c]
+
+      return clauses, assignment
+  
+    def dpll(self, clauses, assignment):
+      # Base Cases
+      if not clauses:
+        return True, assignment
+    
+      if any([len(c) == 0 for c in clauses]):
+        return False, assignment
+    
+      clauses, assignment = self.unit_propogate(clauses, assignment)
+
+      clauses, assignment = self.pure_literal_elim(clauses, assignment)
+
+      if not clauses:
+        return True, assignment
+    
+      if any([len(c) == 0 for c in clauses]):
+        return False, assignment
+      for clause in clauses:
+        for lit in clause:
+          var = abs(lit)
+          break
+        break
+
+      new_assignment = assignment.copy()
+      new_assignment[var] = True
+      new_clauses = [c for c in clauses if var not in c]
+      for claue in new_clauses:
+        if -var in clause:
+          clause.remove(-var)
+
+      satisfiable, final_assignment = self.dpll(new_clauses, new_assignment)
+
+      if satisfiable:
+        return True, final_assignment
+    
+      new_assigment = assignment.copy()
+      new_assignment[var] = False
+      new_clauses = [c for c in clauses if -var not in c]
+      for clause in new_clauses:
+        if var in clause:
+          clause.remove(var)
+
+      return self.dpll(new_clauses, new_assigment)
