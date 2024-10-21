@@ -1,5 +1,4 @@
 # File: Solvers.py
-# Description: Define the 3 SAT Solvers
 import random
 import math
 
@@ -9,25 +8,18 @@ class Solvers:
         self.numClauses = num_clauses
         self.clauses = clauses
 
-    def G_SAT(self, maxFlips = 10000):
-        assignment = []
-        for _ in range(self.numVars):
-            randVal = random.choice([True, False])
-            assignment.append(randVal)
-
+    def G_SAT(self, maxFlips=10000):
+        assignment = [random.choice([True, False]) for _ in range(self.numVars)]
         for _ in range(maxFlips):
             if self.is_satisfied(assignment):
                 return True, assignment
 
             bestFlip = None
             maxSatisfied = 0
+
             for i in range(self.numVars):
                 assignment[i] = not assignment[i]
-                satisfiedClauses = 0
-
-                for clause in self.clauses:
-                    if self.is_satisfied_clause(clause, assignment):
-                        satisfiedClauses += 1
+                satisfiedClauses = sum(1 for clause in self.clauses if self.is_satisfied_clause(clause, assignment))
 
                 if satisfiedClauses > maxSatisfied:
                     maxSatisfied = satisfiedClauses
@@ -35,138 +27,129 @@ class Solvers:
 
                 assignment[i] = not assignment[i]
 
-                if bestFlip is not None:
-                    assignment[bestFlip] = not assignment[bestFlip]
+            if bestFlip is not None:
+                assignment[bestFlip] = not assignment[bestFlip]
 
         return False, None
 
-    def Simulated_Annealing(self, maxIters = 10000, temp = 1.0, coolingRate = 0.99):
-        assignment = []
-        for i in range(self.numVars):
-            randVal = random.choice([True, False])
-            assignment.append(randVal)
-
+    def Simulated_Annealing(self, maxIters=10000, temp=1.0, coolingRate=0.99):
+        assignment = [random.choice([True, False]) for _ in range(self.numVars)]
         for j in range(maxIters):
             if self.is_satisfied(assignment):
                 return True, assignment
 
             flipVar = random.randint(0, self.numVars - 1)
+            currentSatisfied = sum(1 for clause in self.clauses if self.is_satisfied_clause(clause, assignment))
+
             assignment[flipVar] = not assignment[flipVar]
-            numUnsatisfied = 0
+            newSatisfied = sum(1 for clause in self.clauses if self.is_satisfied_clause(clause, assignment))
 
-            for clasue in self.clauses:
-                if not self.is_satisfied_clause(clasue, assignment):
-                    numUnsatisfied += 1
+            delta = newSatisfied - currentSatisfied
 
-            if numUnsatisfied == 0:
-                return True, assignment
-
-            delta = numUnsatisfied
-
-            if delta > 0:
-                acceptanceProb = math.exp(-delta/temp)
+            if delta < 0:  # Worse solution
+                acceptanceProb = math.exp(delta / temp)
             else:
                 acceptanceProb = 1.0
 
             if random.random() > acceptanceProb:
                 assignment[flipVar] = not assignment[flipVar]
 
-            temp*= coolingRate
+            temp *= coolingRate
 
         return False, None
 
     def is_satisfied(self, assignment):
-        for clause in self.clauses:
-            if not self.is_satisfied_clause(clause, assignment):
-                return False
-
-        return True
+        return all(self.is_satisfied_clause(clause, assignment) for clause in self.clauses)
 
     def is_satisfied_clause(self, clause, assignment):
-        for literal in clause:
-            varIdx = abs(literal) - 1
-            if (literal > 0 and assignment[varIdx]) or (literal < 0 and not assignment[varIdx]):
-                return True
+        return any((literal > 0 and assignment[abs(literal) - 1]) or
+                   (literal < 0 and not assignment[abs(literal) - 1]) for literal in clause)
 
-        return False
+    def DPLL(self):
+        clauses = self.clauses
+        assignment = [False] * self.numVars
 
-    def DPLL(self, clauses, assignment):
-      return self.dpll(clauses, assignment)
+        return self.dpll(clauses, assignment)
 
-    # For DPLL
+        # For DPLL
+
     def unit_propogate(self, clauses, assignment):
-      unit_clauses = [c for c in clauses if len(c) == 1]
-    
-      while unit_clauses:
-        unit = unit_clauses[0]
-        lit = unit[0]
-        assignment[abs(lit)] = lit > 0
+        unit_clauses = [c for c in clauses if len(c) == 1]
 
-        clauses = [c for c in clauses if lit not in c]
+        while unit_clauses:
+            unit = unit_clauses[0]
+            lit = unit[0]
+            var = abs(lit) - 1
+            assignment[var] = lit > 0
+
+            clauses = [c for c in clauses if lit not in c]
+
+            for clause in clauses:
+                if -lit in clause:
+                    clause.remove(-lit)
+
+            unit_clauses = [c for c in clauses if len(c) == 1]
+
+        return clauses, assignment
+
+        # For DPLL
+
+    def pure_literal_elim(self, clauses, assignment):
+
+        literals = set(lit for clause in clauses for lit in clause)
+        pure_literals = [lit for lit in literals if -lit not in literals]
+
+        for lit in pure_literals:
+            var = abs(lit) - 1
+            assignment[var] = lit > 0
+            clauses = [c for c in clauses if lit not in c]
+
+        return clauses, assignment
+
+    def dpll(self, clauses, assignment):
+        # Base Cases
+        if not clauses:
+            return True, assignment
+
+        if any([len(c) == 0 for c in clauses]):
+            return False, assignment
+
+        clauses, assignment = self.unit_propogate(clauses, assignment)
+
+        clauses, assignment = self.pure_literal_elim(clauses, assignment)
+
+        if not clauses:
+            return True, assignment
+
+        if any([len(c) == 0 for c in clauses]):
+            return False, assignment
 
         for clause in clauses:
-          if -lit in clause:
-            clause.remove(-lit)
+            for lit in clause:
+                var = abs(lit) - 1
+                # Just choose the first variable that hasn't been set differently during unit propagation or pure literal elimination
+                if assignment[var] == False:  # Assume unassigned means False in the initial pass
+                    break  # Break from inner loop when a variable is found
+            if assignment[var] == False:
+                break  # Now break from outer loop once an unassigned variable is found
 
-        unit_clauses = [c for c in clauses if len(c) == 1]
-    
-      return clauses, assignment
-  
-    # For DPLL
-    def pure_literal_elim(self, clauses, assignment):
-      literals = set()
-      for clause in clauses:
-        for lit in clause:
-          literals.add(lit)
+        new_assignment = assignment.copy()
+        new_assignment[var] = True
+        new_clauses = [c for c in clauses if var + 1 not in c]
+        for clause in new_clauses:
+            if -(var + 1) in clause:
+                clause.remove(-(var + 1))
 
-      pure_literals = [lit for lit in literals if -lit not in literals]
+        satisfiable, final_assignment = self.dpll(new_clauses, new_assignment)
 
-      for lit in pure_literals:
-        assignment[abs(lit)] = lit > 0
-        clauses = [c for c in clauses if lit not in c]
+        if satisfiable:
+            return True, final_assignment
 
-      return clauses, assignment
-  
-    def dpll(self, clauses, assignment):
-      # Base Cases
-      if not clauses:
-        return True, assignment
-    
-      if any([len(c) == 0 for c in clauses]):
-        return False, assignment
-    
-      clauses, assignment = self.unit_propogate(clauses, assignment)
+        new_assignment = assignment.copy()
+        new_assignment[var] = False
+        new_clauses = [c for c in clauses if -(var + 1) not in c]
+        for clause in new_clauses:
+            if var in clause:
+                clause.remove(var)
 
-      clauses, assignment = self.pure_literal_elim(clauses, assignment)
-
-      if not clauses:
-        return True, assignment
-    
-      if any([len(c) == 0 for c in clauses]):
-        return False, assignment
-      for clause in clauses:
-        for lit in clause:
-          var = abs(lit)
-          break
-        break
-
-      new_assignment = assignment.copy()
-      new_assignment[var] = True
-      new_clauses = [c for c in clauses if var not in c]
-      for claue in new_clauses:
-        if -var in clause:
-          clause.remove(-var)
-
-      satisfiable, final_assignment = self.dpll(new_clauses, new_assignment)
-
-      if satisfiable:
-        return True, final_assignment
-    
-      new_assigment = assignment.copy()
-      new_assignment[var] = False
-      new_clauses = [c for c in clauses if -var not in c]
-      for clause in new_clauses:
-        if var in clause:
-          clause.remove(var)
-
-      return self.dpll(new_clauses, new_assigment)
+        return self.dpll(new_clauses, new_assignment)
