@@ -2,7 +2,7 @@
 # Description: Read and parse the cnf file. Run the solvers. Collect and display the data.
 
 import os
-import Solvers
+from SATSolver import Solvers
 
 CNF_Folder = 'CNF Formulas'
 Hard_CNF_Folder = 'HARD CNF Formulas'

@@ -75,9 +75,6 @@ class Solvers:
 
         return False, None
 
-    def DPLL(self):
-        return
-
     def is_satisfied(self, assignment):
         for clause in self.clauses:
             if not self.is_satisfied_clause(clause, assignment):
